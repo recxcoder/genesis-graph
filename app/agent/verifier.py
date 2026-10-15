@@ -5,14 +5,12 @@ import json
 
 load_dotenv()
 
+MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
 def verify_fact(fact: str, source_url: str) -> tuple[float, str]:
     """
-    Sends a fact to Llama 3.3 70B acting as a judge.
-    Returns (confidence_score, reason).
-
     Score guide:
       0.9+ → clearly factual, well-known
       0.7  → likely true, reasonable claim
@@ -35,10 +33,10 @@ Respond ONLY with a valid JSON object. No explanation outside the JSON.
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model=MODEL,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=150,
-            temperature=0.1   # low temp = consistent verdicts
+            temperature=0.1
         )
 
         raw = response.choices[0].message.content.strip()
@@ -50,13 +48,11 @@ Respond ONLY with a valid JSON object. No explanation outside the JSON.
         score = float(data["score"])
         reason = str(data["reason"])
 
-        # Clamp score to valid range
         score = max(0.0, min(1.0, score))
 
         return score, reason
 
     except json.JSONDecodeError:
-        # If LLM returns malformed JSON, default to uncertain
         return 0.5, "Could not parse verdict — defaulting to uncertain"
 
     except Exception as e:
