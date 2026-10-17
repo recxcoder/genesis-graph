@@ -193,8 +193,9 @@ def gather_context(goal: str, session_id: str) -> str:
 
 # MAIN AGENT LOOP — same structure as Genesis Agent
 
-def run_agent(goal: str):
-    session_id = f"sess_{uuid.uuid4().hex[:8]}"
+def run_agent(goal: str, session_id: str = None):
+    if not session_id:
+        session_id = f"sess_{uuid.uuid4().hex[:8]}"
 
     print("\n" + "─" * 40)
     print(f"🎯 Goal: {goal}")
@@ -233,7 +234,7 @@ Today is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}"""
         }
     ]
 
-    # ── AGENT LOOP ───────────────────────────
+    final_answer = ""
     iteration = 0
 
     while iteration < MAX_ITERATIONS:
@@ -253,7 +254,8 @@ Today is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}"""
             print("✅ GOAL COMPLETED!")
             print("─" * 40)
             print(f"\n📋 Final Answer:\n{response}")
-            print(f"\n🧠 Graph memory: {session_id}")
+            print(f"\n🧠 Graph session: {session_id}")
+            final_answer = response
             break
 
         if result.get("feedback"):
@@ -264,7 +266,9 @@ Today is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}"""
 
         if iteration == MAX_ITERATIONS:
             print("\n⚠️  Max iterations reached!")
-            print(f"\n📋 Partial Answer:\n{response}")
+            final_answer = response
+
+    return final_answer
 
 
 
