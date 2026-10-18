@@ -193,7 +193,7 @@ FALKORDB_PASSWORD=your_password
 Get your Groq API key at [console.groq.com](https://console.groq.com)  
 Get your FalkorDB instance at [app.falkordb.cloud](https://app.falkordb.cloud)
 
-### 5. Run the agent
+### 4. Run the agent
 
 ```bash
 python -m app.agent.planner
