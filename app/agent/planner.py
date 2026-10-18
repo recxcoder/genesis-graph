@@ -26,7 +26,9 @@ from app.tools.fact_extractor import extract_verify_store
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL  = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+MODEL  = os.getenv("GROQ_MODEL")
+if not MODEL:
+    raise ValueError("GROQ_MODEL not set in .env - add your model name")
 
 MAX_ITERATIONS = 3
 
@@ -93,60 +95,6 @@ Answer NO only if the answer is stable general knowledge."""
     return "YES" in decision.upper()
 
 
-# FACT EXTRACTOR + VERIFIER
-
-def extract_and_store_factsextract_verify_store(session_id, url, content):
-    """Extract facts from page content, verify each, store in graph."""
-
-    raw = llm([{
-        "role": "user",
-        "content": f"""Extract 3 to 5 key factual claims from this content.
-Return ONLY a Python list of strings. No explanation. No markdown.
-Example: ["Fact one.", "Fact two.", "Fact three."]
-
-Content:
-{content[:2000]}"""
-    }])
-
-    try:
-        import json
-        raw = raw.replace("```json", "").replace("```", "").strip()
-        facts = json.loads(raw)
-        if not isinstance(facts, list):
-            return
-    except Exception:
-        return
-
-    for fact_text in facts:
-        # Store fact in graph
-        fact_id = create_fact(session_id, url, fact_text)
-
-        # Verify with LLM-as-Judge
-        verdict_raw = llm([{
-            "role": "user",
-            "content": f"""You are a fact-checking judge. Evaluate this claim.
-
-CLAIM: {fact_text}
-SOURCE: {url}
-
-Respond ONLY with valid JSON:
-{{"score": <0.0 to 1.0>, "reason": "<one sentence>"}}"""
-        }])
-
-        try:
-            import json as j
-            verdict_raw = verdict_raw.replace("```json", "").replace("```", "").strip()
-            verdict = j.loads(verdict_raw)
-            score   = float(verdict.get("score", 0.5))
-            reason  = verdict.get("reason", "")
-        except Exception:
-            score, reason = 0.5, "Could not parse verdict"
-
-        store_verdict(session_id, fact_id, score, reason)
-        print(f"   📌 [{score:.2f}] {fact_text[:80]}")
-
-
-
 # GATHER CONTEXT
 
 def gather_context(goal: str, session_id: str) -> str:
@@ -196,6 +144,10 @@ def gather_context(goal: str, session_id: str) -> str:
 def run_agent(goal: str, session_id: str = None):
     if not session_id:
         session_id = f"sess_{uuid.uuid4().hex[:8]}"
+        print(f"\n🆕 New session: {session_id}")
+    else:
+        print(f"\n♻️  Resuming session: {session_id}")
+
 
     print("\n" + "─" * 40)
     print(f"🎯 Goal: {goal}")
@@ -268,12 +220,31 @@ Today is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}"""
             print("\n⚠️  Max iterations reached!")
             final_answer = response
 
-    return final_answer
+            # at the very end of run_agent, replace the final_answer tracking with this:
+
+    result = {
+        "session_id":   session_id,
+        "final_answer": final_answer,
+        "completed":    bool(final_answer),
+        "iterations":   iteration
+    }
+
+    print(f"\n📊 Result: {result['iterations']} iterations, completed: {result['completed']}")
+    return result
 
 
 
 # ENTRY POINT — user types query in terminal
 
 if __name__ == "__main__":
-    goal = input("Enter prompt: ")
-    run_agent(goal)
+    print("─" * 40)
+    print("Genesis-graph")
+    print("─" * 40)
+
+    existing = input("Enter session ID to resume (or press Enter for new): ").strip()
+    session_id = existing if existing else None
+
+    goal   = input("Enter prompt: ")
+    result = run_agent(goal, session_id=session_id)
+
+    print(f"\n🆔 Session ID (save this to resume): {result['session_id']}")
