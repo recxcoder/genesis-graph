@@ -134,7 +134,10 @@ def gather_context(goal: str, session_id: str) -> str:
         page_contents.append(f"URL: {url}\n{content[:800]}")
 
     # Formatted string for LLM context
-    search_text = search_web(goal, max_results=5)
+    search_text = "\n\n".join([
+        f"Title: {r['title']}\nURL: {r['url']}\nSnippet: {r['snippet'][:200]}"
+        for r in raw_results
+    ])
 
     return f"Search Results:\n{search_text}\n\nPage Content:\n{'---'.join(page_contents)}"
 
