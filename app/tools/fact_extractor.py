@@ -1,5 +1,3 @@
-# app/tools/fact_extractor.py
-
 from groq import Groq
 from dotenv import load_dotenv
 from app.graph.writer import create_fact, store_verdict
@@ -8,7 +6,9 @@ import os, json
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL  = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+MODEL = os.getenv("GROQ_MODEL")
+if not MODEL:
+    raise ValueError("GROQ_MODEL not set in .env — add your model name")
 
 
 def extract_facts(content: str) -> list[str]:
@@ -72,13 +72,13 @@ Score guide:
 
         raw     = raw.replace("```json", "").replace("```", "").strip()
         verdict = json.loads(raw)
-        score   = max(0.0, min(1.0, float(verdict.get("score", 0.5))))
+        score   = max(0.0, min(1.0, float(verdict.get("score", 0.0))))
         reason  = verdict.get("reason", "")
         return score, reason
 
     except Exception as e:
         print(f"[verify_fact] Failed: {e}")
-        return 0.5, "Verification failed"
+        return 0.0, "Verification failed"
 
 
 def extract_verify_store(session_id: str, url: str, content: str):
