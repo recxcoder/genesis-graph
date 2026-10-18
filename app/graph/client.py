@@ -6,8 +6,8 @@ load_dotenv()
 
 def _connect() -> FalkorDB:
     return FalkorDB(
-        host=os.getenv("FALKORDB_HOST"),
-        port=int(os.getenv("FALKORDB_PORT")),
+        host=os.getenv("FALKORDB_HOST", "localhost"),
+        port=int(os.getenv("FALKORDB_PORT", "6379")),
         username=os.getenv("FALKORDB_USERNAME"),
         password=os.getenv("FALKORDB_PASSWORD")
     )
