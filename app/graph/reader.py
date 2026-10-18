@@ -59,7 +59,7 @@ def multihop_related_facts(session_id: str, topic: str) -> list[str]:
               -[:CONTAINED]->(q:Query)
               -[:FOUND]->(w:WebPage)
               -[:MENTIONS]->(f:Fact)
-        WHERE toLower(q.text) CONTAINS toLower($topic)
+        WHERE toLower($topic) CONTAINS toLower(q.text)
           AND f.verified = true
         RETURN f.text, f.confidence, w.url
         ORDER BY f.confidence DESC
@@ -75,19 +75,19 @@ def multihop_related_facts(session_id: str, topic: str) -> list[str]:
 # 5. FULL GRAPH SNAPSHOT — for /graph API
 
 def get_graph_snapshot(session_id: str) -> dict:
-    
     g = get_graph(session_id)
 
-    # All facts with their sources
     result = g.query("""
         MATCH (q:Query)-[:FOUND]->(w:WebPage)-[:MENTIONS]->(f:Fact)
         OPTIONAL MATCH (f)-[:VERIFIED_BY]->(v:Verdict)
         RETURN q.text, w.url, w.title, f.text, f.confidence, f.verified, v.reason
     """)
 
-    nodes = []
-    edges = []
-    seen_urls = set()
+    nodes      = []
+    edges      = []
+    seen_urls  = set()
+    seen_facts = set()   # ← add this
+    seen_edges = set()   # ← add this
 
     for row in result.result_set:
         query_text, url, title, fact, confidence, verified, reason = row
@@ -96,24 +96,31 @@ def get_graph_snapshot(session_id: str) -> dict:
             nodes.append({'type': 'WebPage', 'url': url, 'title': title})
             seen_urls.add(url)
 
-        nodes.append({
-            'type': 'Fact',
-            'text': fact,
-            'confidence': confidence,
-            'verified': verified,
-            'verdict_reason': reason
-        })
+        # ← dedup facts
+        if fact not in seen_facts:
+            nodes.append({
+                'type':           'Fact',
+                'text':           fact,
+                'confidence':     confidence,
+                'verified':       verified,
+                'verdict_reason': reason
+            })
+            seen_facts.add(fact)
 
-        edges.append({
-            'from': url,
-            'to': fact,
-            'relationship': 'MENTIONS'
-        })
+        # ← dedup edges
+        edge_key = f"{url}→{fact}"
+        if edge_key not in seen_edges:
+            edges.append({
+                'from':         url,
+                'to':           fact,
+                'relationship': 'MENTIONS'
+            })
+            seen_edges.add(edge_key)
 
     return {
-        'session_id': session_id,
-        'total_facts': len([n for n in nodes if n['type'] == 'Fact']),
-        'total_pages': len(seen_urls),
-        'nodes': nodes,
-        'edges': edges
+        'session_id':   session_id,
+        'total_facts':  len(seen_facts),   # ← accurate count now
+        'total_pages':  len(seen_urls),
+        'nodes':        nodes,
+        'edges':        edges
     }
