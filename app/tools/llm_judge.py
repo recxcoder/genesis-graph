@@ -5,7 +5,9 @@ import os
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL  = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+MODEL = os.getenv("GROQ_MODEL")
+if not MODEL:
+    raise ValueError("GROQ_MODEL not set in .env — add your model name")
 
 
 def llm_judge(goal: str, response: str) -> dict:
